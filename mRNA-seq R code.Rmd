@@ -1,0 +1,458 @@
+---
+  title: "DESeq Analysis"
+author: "Britney & Luoyu"
+date: "4/11/2021"
+output:
+  html_document:
+  df_print: paged
+---
+  
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(DESeq2)
+```
+
+## Import Data
+```{r}
+setwd("/Users/zhangluoyu/Desktop/DGE_celegans/htseqdata")
+#countdatas, set working directory first to read the tabular file
+count_data = read.table("Galaxy327.tabular")
+colnames(count_data) = c("Gene","0_R1-0_S1","0_R1-8_S13","0_R2-0_S4","0_R2-8_S16","0_R3-0_S7","0_R3-8_S19","0_R4-0_S10","0_R4-8_S22","10_R1-0_S2","10_R1-8_S14","10_R2-0_S5","10_R2-8_S17","10_R3-0_S8","10_R3-8_S20","10_R4-0_S11","10_R4-8_S23","100_R1-0_S3","100_R1-8_S15","100_R2-0_S6","100_R2-8_S18","100_R3-0_S9","100_R3-8_S21","100_R4-0_S12","100_R4-8_S24")
+countdata = count_data[,-1]
+rownames(countdata) = count_data[,1]
+#count_data = count_data %>% remove_rownames %>% column_to_rownames(var="Gene")
+
+
+
+#all data on the 0 days
+countdata_0days_0_10<-subset(countdata, select = c("0_R1-0_S1","0_R2-0_S4","0_R3-0_S7","0_R4-0_S10","10_R1-0_S2","10_R2-0_S5", "10_R3-0_S8","10_R4-0_S11"))
+countdata_0days_0_100<-subset(countdata, select = c("0_R1-0_S1","0_R2-0_S4","0_R3-0_S7","0_R4-0_S10","100_R1-0_S3","100_R2-0_S6","100_R3-0_S9","100_R4-0_S12"))
+countdata_0days_10_100<-subset(countdata, select = c("10_R1-0_S2","10_R2-0_S5", "10_R3-0_S8","10_R4-0_S11","100_R1-0_S3","100_R2-0_S6","100_R3-0_S9","100_R4-0_S12"))
+#all data on the 8 days
+countdata_8days_0_10<-subset(countdata, select = c("0_R1-8_S13","0_R2-8_S16","0_R3-8_S19","0_R4-8_S22","10_R1-8_S14","10_R2-8_S17","10_R3-8_S20","10_R4-8_S23"))
+countdata_8days_0_100<-subset(countdata, select = c("0_R1-8_S13","0_R2-8_S16","0_R3-8_S19","0_R4-8_S22","100_R1-8_S15","100_R2-8_S18","100_R3-8_S21","100_R4-8_S24"))
+countdata_8days_10_100<-subset(countdata, select = c("10_R1-8_S14","10_R2-8_S17","10_R3-8_S20","10_R4-8_S23","100_R1-8_S15","100_R2-8_S18","100_R3-8_S21","100_R4-8_S24"))
+#all data on the 0 conc
+countdata_0conc<-subset(countdata, select = c("0_R1-0_S1","0_R1-8_S13","0_R2-0_S4","0_R2-8_S16","0_R3-0_S7","0_R3-8_S19","0_R4-0_S10","0_R4-8_S22"))
+#all data on the 10 conc
+countdata_10conc<-subset(countdata, select = c("10_R1-0_S2","10_R1-8_S14","10_R2-0_S5","10_R2-8_S17","10_R3-0_S8","10_R3-8_S20","10_R4-0_S11","10_R4-8_S23"))
+#all data on the 100 conc
+countdata_100conc<-subset(countdata, select = c("100_R1-0_S3","100_R1-8_S15","100_R2-0_S6","100_R2-8_S18","100_R3-0_S9","100_R3-8_S21","100_R4-0_S12","100_R4-8_S24"))
+
+
+#metadatas for corresponding countdatas                                               
+meta_data = read.csv("Metadata_b.csv", header = TRUE)
+meta_data$conc = as.factor(meta_data$conc)
+meta_data$rap = as.factor(meta_data$rap)
+meta_data$day = as.factor(meta_data$day)
+
+meta_data_0days_0_10<- subset(meta_data, (day == 0 & (conc == 0 | conc ==10)))
+meta_data_0days_0_100<- subset(meta_data, (day == 0 & (conc == 0 | conc ==100)))
+meta_data_0days_10_100<- subset(meta_data, (day == 0 & (conc == 10 | conc ==100)))
+meta_data_8days_0_10<- subset(meta_data, (day == 8 & (conc == 0 | conc ==10)))
+meta_data_8days_0_100<- subset(meta_data, (day == 8 & (conc == 0 | conc ==100)))
+meta_data_8days_10_100<- subset(meta_data, (day == 8 & (conc == 10 | conc ==100)))
+meta_data_0conc<- subset(meta_data, conc == 0)
+meta_data_10conc<- subset(meta_data, conc == 10)
+meta_data_100conc<- subset(meta_data, conc == 100)
+
+
+#dds files for each group: 0/8 days to compare conc effect; 0/10/100 conc to compare days effect
+dds_0days_0_10 = DESeqDataSetFromMatrix(countData = countdata_0days_0_10,
+                                        colData = meta_data_0days_0_10,
+                                        design = ~ conc)
+dds_0days_0_100 = DESeqDataSetFromMatrix(countData = countdata_0days_0_100,
+                                         colData = meta_data_0days_0_100,
+                                         design = ~ conc)
+dds_0days_10_100 = DESeqDataSetFromMatrix(countData = countdata_0days_10_100,
+                                          colData = meta_data_0days_10_100,
+                                          design = ~ conc)
+dds_8days_0_10 = DESeqDataSetFromMatrix(countData = countdata_8days_0_10,
+                                        colData = meta_data_8days_0_10,
+                                        design = ~ conc)
+dds_8days_0_100 = DESeqDataSetFromMatrix(countData = countdata_8days_0_100,
+                                         colData = meta_data_8days_0_100,
+                                         design = ~ conc)
+dds_8days_10_100 = DESeqDataSetFromMatrix(countData = countdata_8days_10_100,
+                                          colData = meta_data_8days_10_100,
+                                          design = ~ conc)
+dds_0conc = DESeqDataSetFromMatrix(countData = countdata_0conc,
+                                   colData = meta_data_0conc,
+                                   design = ~ day)
+dds_10conc = DESeqDataSetFromMatrix(countData = countdata_10conc,
+                                    colData = meta_data_10conc,
+                                    design = ~ day)
+dds_100conc = DESeqDataSetFromMatrix(countData = countdata_100conc,
+                                     colData = meta_data_100conc,
+                                     design = ~ day)
+
+dds_0days_0_10 = DESeq(dds_0days_0_10)
+dds_0days_0_100 = DESeq(dds_0days_0_100)
+dds_0days_10_100 = DESeq(dds_0days_10_100)
+dds_8days_0_10 = DESeq(dds_8days_0_10)
+dds_8days_0_100 = DESeq(dds_8days_0_100)
+dds_8days_10_100 = DESeq(dds_8days_10_100)
+dds_0conc = DESeq(dds_0conc)
+dds_10conc = DESeq(dds_10conc)
+dds_100conc = DESeq(dds_100conc)
+```
+
+
+## Results Table
+```{r}
+res_0days_0_10 = results(dds_0days_0_10)
+head(results(dds_0days_0_10, tidy=TRUE))
+
+res_0days_0_100 = results(dds_0days_0_100)
+head(results(dds_0days_0_100, tidy=TRUE))
+
+res_0days_10_100 = results(dds_0days_10_100)
+head(results(dds_0days_10_100, tidy=TRUE))
+
+res_8days_0_10 = results(dds_8days_0_10)
+head(results(dds_8days_0_10, tidy=TRUE))
+
+res_8days_0_100 = results(dds_8days_0_100)
+head(results(dds_8days_0_100, tidy=TRUE))
+
+res_8days_10_100 = results(dds_8days_10_100)
+head(results(dds_8days_10_100, tidy=TRUE))
+
+res_0conc = results(dds_0conc)
+head(results(dds_0conc, tidy=TRUE))
+
+res_10conc = results(dds_10conc)
+head(results(dds_10conc, tidy=TRUE))
+
+res_100conc = results(dds_100conc)
+head(results(dds_100conc, tidy=TRUE))
+```
+
+
+## Summary of differential gene expression & Sorting by adjusted p-value
+```{r}
+
+summary(res_0days_0_10)
+res_0days_0_10 = res_0days_0_10[order(res_0days_0_10$padj),]
+head(res_0days_0_10)
+
+summary(res_0days_0_100)
+res_0days_0_100 = res_0days_0_100[order(res_0days_0_100$padj),]
+head(res_0days_0_100)
+
+summary(res_0days_10_100)
+res_0days_10_100 = res_0days_10_100[order(res_0days_10_100$padj),]
+head(res_0days_10_100)
+
+summary(res_8days_0_10)
+res_8days_0_10 = res_8days_0_10[order(res_8days_0_10$padj),]
+head(res_8days_0_10)
+
+summary(res_8days_0_100)
+res_8days_0_100 = res_8days_0_100[order(res_8days_0_100$padj),]
+head(res_8days_0_100)
+
+summary(res_8days_10_100)
+res_8days_10_100 = res_8days_10_100[order(res_8days_10_100$padj),]
+head(res_8days_10_100)
+
+summary(res_0conc)
+res_0conc = res_0conc[order(res_0conc$padj),]
+head(res_0conc)
+
+summary(res_10conc)
+res_10conc = res_10conc[order(res_10conc$padj),]
+head(res_10conc)
+
+summary(res_100conc)
+res_100conc = res_100conc[order(res_100conc$padj),]
+head(res_100conc)
+```
+
+
+## plotCounts
+```{r}
+#e.g. compare the normalized counts between different LC concentrations for the top 6 genes
+par(mfrow=c(2,3))
+plotCounts(dds, gene="WBGene00004978", intgroup="conc")
+plotCounts(dds, gene="WBGene00019380", intgroup="conc")
+plotCounts(dds, gene="WBGene00014165", intgroup="conc")
+plotCounts(dds, gene="WBGene00018891", intgroup="conc")
+plotCounts(dds, gene="WBGene00021585", intgroup="conc")
+plotCounts(dds, gene="WBGene00015525", intgroup="conc")
+```
+
+
+## Volcano Plot
+#0days
+#0_10
+par(mfrow=c(1,1))
+#basic plot
+with(res_0days_0_10, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_0days_0_10, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_0days_0_10, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_0days_0_10$log2FoldChange) > 1 & res_0days_0_10$padj < 0.05
+text(res_0days_0_10$log2FoldChange[gn.selected],
+     -log10(res_0days_0_10$padj)[gn.selected],
+     lab=rownames(res_0days_0_10)[gn.selected ], cex=0.5)
+gn.selected_up = res_0days_0_10$log2FoldChange > 1 & res_0days_0_10$padj < 0.05
+gn.selected_down = res_0days_0_10$log2FoldChange < -1 & res_0days_0_10$padj < 0.05
+david0days_0_10_up<-data.frame(rownames(res_0days_0_10)[gn.selected_up ])
+david0days_0_10_down<-data.frame(rownames(res_0days_0_10)[gn.selected_down ])
+write.csv(na.omit(david0days_0_10_up),"~/Desktop/DGE_celegans/updown/0days_0_10_up.csv", row.names = FALSE)
+write.csv(na.omit(david0days_0_10_down),"~/Desktop/DGE_celegans/updown/0days_0_10_down.csv", row.names = FALSE)
+
+#0_100
+par(mfrow=c(1,1))
+#basic plot
+with(res_0days_0_100, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_0days_0_100, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_0days_0_100, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_0days_0_100$log2FoldChange) > 1 & res_0days_0_100$padj < 0.05 
+text(res_0days_0_100$log2FoldChange[gn.selected],
+     -log10(res_0days_0_100$padj)[gn.selected],
+     lab=rownames(res_0days_0_100)[gn.selected ], cex=0.5)
+david0days_0_100<-data.frame(rownames(res_0days_0_100)[gn.selected ])
+gn.selected_up = res_0days_0_100$log2FoldChange > 1 & res_0days_0_100$padj < 0.05
+gn.selected_down = res_0days_0_100$log2FoldChange < -1 & res_0days_0_100$padj < 0.05
+david0days_0_100_up<-data.frame(rownames(res_0days_0_100)[gn.selected_up ])
+david0days_0_100_down<-data.frame(rownames(res_0days_0_100)[gn.selected_down ])
+write.csv(na.omit(david0days_0_100_up),"~/Desktop/DGE_celegans/updown/0days_0_100_up.csv", row.names = FALSE)
+write.csv(na.omit(david0days_0_100_down),"~/Desktop/DGE_celegans/updown/0days_0_100_down.csv", row.names = FALSE)
+
+#10_100
+par(mfrow=c(1,1))
+#basic plot
+with(res_0days_10_100, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_0days_10_100, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_0days_10_100, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_0days_10_100$log2FoldChange) > 1 & res_0days_10_100$padj < 0.05 
+text(res_0days_10_100$log2FoldChange[gn.selected],
+     -log10(res_0days_10_100$padj)[gn.selected],
+     lab=rownames(res_0days_10_100)[gn.selected ], cex=0.5)
+david0days_10_100<-data.frame(rownames(res_0days_10_100)[gn.selected ])
+gn.selected_up = res_0days_10_100$log2FoldChange > 1 & res_0days_10_100$padj < 0.05
+gn.selected_down = res_0days_10_100$log2FoldChange < -1 & res_0days_10_100$padj < 0.05
+david0days_10_100_up<-data.frame(rownames(res_0days_10_100)[gn.selected_up ])
+david0days_10_100_down<-data.frame(rownames(res_0days_10_100)[gn.selected_down ]) 
+write.csv(na.omit(david0days_10_100_up),"~/Desktop/DGE_celegans/updown/0days_10_100_up.csv", row.names = FALSE)
+write.csv(na.omit(david0days_10_100_down),"~/Desktop/DGE_celegans/updown/0days_10_100_down.csv", row.names = FALSE)
+
+#8days
+#0_10
+par(mfrow=c(1,1))
+#basic plot
+with(res_8days_0_10, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_8days_0_10, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_8days_0_10, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_8days_0_10$log2FoldChange) > 1 & res_8days_0_10$padj < 0.05 
+text(res_8days_0_10$log2FoldChange[gn.selected],
+     -log10(res_8days_0_10$padj)[gn.selected],
+     lab=rownames(res_8days_0_10)[gn.selected ], cex=0.5)
+david8days_0_10<-data.frame(rownames(res_8days_0_10)[gn.selected ])
+gn.selected_up = res_8days_0_10$log2FoldChange > 1 & res_8days_0_10$padj < 0.05
+gn.selected_down = res_8days_0_10$log2FoldChange < -1 & res_8days_0_10$padj < 0.05
+david8days_0_10_up<-data.frame(rownames(res_8days_0_10)[gn.selected_up ])
+david8days_0_10_down<-data.frame(rownames(res_8days_0_10)[gn.selected_down ])
+write.csv(na.omit(david8days_0_10_up),"~/Desktop/DGE_celegans/updown/8days_0_10_up.csv", row.names = FALSE)
+write.csv(na.omit(david8days_0_10_down),"~/Desktop/DGE_celegans/updown/8days_0_10_down.csv", row.names = FALSE)
+
+#0_100
+par(mfrow=c(1,1))
+#basic plot
+with(res_8days_0_100, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_8days_0_100, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_8days_0_100, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_8days_0_100$log2FoldChange) > 1 & res_8days_0_100$padj < 0.05 
+text(res_8days_0_100$log2FoldChange[gn.selected],
+     -log10(res_8days_0_100$padj)[gn.selected],
+     lab=rownames(res_8days_0_100)[gn.selected ], cex=0.5)
+david8days_0_100<-data.frame(rownames(res_8days_0_100)[gn.selected ])
+gn.selected_up = res_8days_0_100$log2FoldChange > 1 & res_8days_0_100$padj < 0.05
+gn.selected_down = res_8days_0_100$log2FoldChange < -1 & res_8days_0_100$padj < 0.05
+david8days_0_100_up<-data.frame(rownames(res_8days_0_100)[gn.selected_up ])
+david8days_0_100_down<-data.frame(rownames(res_8days_0_100)[gn.selected_down ])
+write.csv(na.omit(david8days_0_100_up),"~/Desktop/DGE_celegans/updown/8days_0_100_up.csv", row.names = FALSE)
+write.csv(na.omit(david8days_0_100_down),"~/Desktop/DGE_celegans/updown/8days_0_100_down.csv", row.names = FALSE)
+
+
+#10_100
+par(mfrow=c(1,1))
+#basic plot
+with(res_8days_10_100, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_8days_10_100, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_8days_10_100, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_8days_10_100$log2FoldChange) > 1 & res_8days_10_100$padj < 0.05 
+text(res_8days_10_100$log2FoldChange[gn.selected],
+     -log10(res_8days_10_100$padj)[gn.selected],
+     lab=rownames(res_8days_10_100)[gn.selected ], cex=0.5)
+david8days_10_100<-data.frame(rownames(res_8days_10_100)[gn.selected ])
+gn.selected_up = res_8days_10_100$log2FoldChange > 1 & res_8days_10_100$padj < 0.05
+gn.selected_down = res_8days_10_100$log2FoldChange < -1 & res_8days_10_100$padj < 0.05
+david8days_10_100_up<-data.frame(rownames(res_8days_10_100)[gn.selected_up ])
+david8days_10_100_down<-data.frame(rownames(res_8days_10_100)[gn.selected_down ])
+write.csv(na.omit(david8days_10_100_up),"~/Desktop/DGE_celegans/updown/8days_10_100_up.csv", row.names = FALSE)
+write.csv(na.omit(david8days_10_100_down),"~/Desktop/DGE_celegans/updown/8days_10_100_down.csv", row.names = FALSE)
+
+
+#0conc
+par(mfrow=c(1,1))
+#basic plot
+with(res_0conc, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_0conc, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_0conc, padj < .05 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_0conc$log2FoldChange) > 1 & res_0conc$padj < 0.05 
+text(res_0conc$log2FoldChange[gn.selected],
+     -log10(res_0conc$padj)[gn.selected],
+     lab=rownames(res_0conc)[gn.selected ], cex=0.5)
+gn.selected_up = res_0conc$log2FoldChange > 1 & res_0conc$padj < 0.05 
+gn.selected_down = res_0conc$log2FoldChange < -1 & res_0conc$padj < 0.05
+david0conc_up<-data.frame(rownames(res_0conc)[gn.selected_up ])
+david0conc_down<-data.frame(rownames(res_0conc)[gn.selected_down ])
+write.csv(na.omit(david0conc_up),"~/Desktop/DGE_celegans/updown/0conc_up.csv", row.names = FALSE)
+write.csv(na.omit(david0conc_down),"~/Desktop/DGE_celegans/updown/0conc_down.csv", row.names = FALSE)
+
+
+#10conc
+par(mfrow=c(1,1))
+#basic plot
+with(res_10conc, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_10conc, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_10conc, padj < .05 & abs(log2FoldChange) > 2), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_10conc$log2FoldChange) > 1 & res_10conc$padj < 0.05 
+text(res_10conc$log2FoldChange[gn.selected],
+     -log10(res_10conc$padj)[gn.selected],
+     lab=rownames(res_10conc)[gn.selected ], cex=0.5)
+gn.selected_up = res_10conc$log2FoldChange > 1 & res_10conc$padj < 0.05 
+gn.selected_down = res_10conc$log2FoldChange < -1 & res_10conc$padj < 0.05
+david10conc_up<-data.frame(rownames(res_10conc)[gn.selected_up ])
+david10conc_down<-data.frame(rownames(res_10conc)[gn.selected_down ])
+write.csv(na.omit(david10conc_up),"~/Desktop/DGE_celegans/updown/10conc_up.csv", row.names = FALSE)
+write.csv(na.omit(david10conc_down),"~/Desktop/DGE_celegans/updown/10conc_down.csv", row.names = FALSE)
+
+
+#100conc
+par(mfrow=c(1,1))
+#basic plot
+with(res_100conc, plot(log2FoldChange, -log10(pvalue), pch = 20, panel.first=grid(), main = "Volcano plot", xlim=c(-3,3)))
+#colored points: blue if padj < 0.01, red if log2FC > 1 and padj < 0.05)
+with(subset(res_100conc, padj < .01 ), points(log2FoldChange, -log10(pvalue), pch = 20, col="blue"))
+with(subset(res_100conc, padj < .025 & abs(log2FoldChange) > 1), points(log2FoldChange, -log10(pvalue), pch = 20, col = "red"))
+
+#cut off line
+abline(v=0)
+abline(v=c(-1,1), col="brown")
+abline(h=-log10(0.05), col="brown")
+
+#showing gene
+gn.selected = abs(res_100conc$log2FoldChange) > 1 & res_100conc$padj < 0.025 
+text(res_100conc$log2FoldChange[gn.selected],
+     -log10(res_100conc$padj)[gn.selected],
+     lab=rownames(res_100conc)[gn.selected ], cex=0.5)
+gn.selected_up = res_100conc$log2FoldChange > 1 & res_100conc$padj < 0.05 
+gn.selected_down = res_100conc$log2FoldChange < -1 & res_100conc$padj < 0.05
+david100conc_up<-na.omit(data.frame(rownames(res_100conc)[gn.selected_up ]))
+david100conc_down<-data.frame(rownames(res_100conc)[gn.selected_down ])
+write.csv(na.omit(david100conc_up),"~/Desktop/DGE_celegans/updown/100conc_up.csv", row.names = FALSE)
+write.csv(na.omit(david100conc_down),"~/Desktop/DGE_celegans/updown/100conc_down.csv", row.names = FALSE)
+
+
+## PCA
+```{r}
+vsdata = vst(dds, blind=FALSE)
+plotPCA(vsdata, intgroup="conc")
+
+vsdata_0days_0_10 = vst(dds_0days_0_10, blind=FALSE)
+plotPCA(vsdata_0days_0_10, intgroup="conc")
+text(x=1,labels=seq_along(meta_data_0days_0_10$rap))
+
+
+vsdata_0days_0_100 = vst(dds_0days_0_100, blind=FALSE)
+plotPCA(vsdata_0days_0_100, intgroup="conc")
+
+vsdata_0days_10_100 = vst(dds_0days_10_100, blind=FALSE)
+plotPCA(vsdata_0days_10_100, intgroup="conc")
+
+
+vsdata_8days_0_10 = vst(dds_8days_0_10, blind=FALSE)
+plotPCA(vsdata_8days_0_10, intgroup="conc")
+
+vsdata_8days_0_100 = vst(dds_8days_0_100, blind=FALSE)
+plotPCA(vsdata_8days_0_100, intgroup="conc")
+
+vsdata_8days_10_100 = vst(dds_8days_10_100, blind=FALSE)
+plotPCA(vsdata_8days_10_100, intgroup="conc")
+
+vsdata_0conc = vst(dds_0conc, blind=FALSE)
+plotPCA(vsdata_0conc, intgroup="day")
+
+vsdata_10conc = vst(dds_10conc, blind=FALSE)
+plotPCA(vsdata_10conc, intgroup="day")
+
+vsdata_100conc = vst(dds_100conc, blind=FALSE)
+plotPCA(vsdata_100conc, intgroup="day")
+```
