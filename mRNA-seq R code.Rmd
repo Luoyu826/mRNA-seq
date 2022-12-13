@@ -456,3 +456,30 @@ plotPCA(vsdata_10conc, intgroup="day")
 vsdata_100conc = vst(dds_100conc, blind=FALSE)
 plotPCA(vsdata_100conc, intgroup="day")
 ```
+#' Cyclic Loess normalization
+#' 
+#' Log2 transformed data is normalized by Loess method using the function
+#' "normalizeCyclicLoess". Further information is available for the function
+#' "normalizeCyclicLoess" in the Limma package.
+#' 
+#' @param rawMatrix Target matrix to be normalized
+#' @param noLogTransform Assumes no need for log transformation
+#' @return Normalized matrix
+#' @export
+#' @examples
+#' data(example_data_only_values_small)
+#' normMatrix <- performCyclicLoessNormalization(example_data_only_values)
+performCyclicLoessNormalization <- function(rawMatrix, noLogTransform=FALSE) {
+    
+    if (!noLogTransform) {
+        log2Matrix <- log2(rawMatrix)
+    }
+    else {
+        log2Matrix <- rawMatrix
+    }
+    
+    normMatrix <- limma::normalizeCyclicLoess(log2Matrix, method="fast")
+    colnames(normMatrix) <- colnames(rawMatrix)
+    
+    normMatrix
+}
